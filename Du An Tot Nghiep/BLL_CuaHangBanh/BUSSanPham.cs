@@ -11,7 +11,12 @@
             return dal.GetAll();
         }
 
-        public void ThemSanPham(DTOSanPham sp)
+    public string LayMaSanPhamTheoTen(string tenSP)
+    {
+        return dal.LayMaSanPhamTheoTen(tenSP);
+    }
+
+    public void ThemSanPham(DTOSanPham sp)
         {
             dal.Insert(sp);
         }

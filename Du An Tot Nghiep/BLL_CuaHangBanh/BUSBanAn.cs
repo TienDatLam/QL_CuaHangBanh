@@ -16,6 +16,11 @@ namespace BLL_CuaHangBanh
         {
             return dal.TimBanTheoMa(maBan);
         }
+        public void CapNhatTrangThai(int maBan, string trangThai)
+        {
+            dal.UpdateTrangThai(maBan, trangThai);
+        }
+
 
         public DTOBanAn LayTheoMa(int maBan)
         {

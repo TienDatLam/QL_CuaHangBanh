@@ -189,9 +189,9 @@
             // picSanPham
             // 
             picSanPham.BackColor = SystemColors.ControlLightLight;
-            picSanPham.Location = new Point(413, 279);
+            picSanPham.Location = new Point(399, 279);
             picSanPham.Name = "picSanPham";
-            picSanPham.Size = new Size(194, 147);
+            picSanPham.Size = new Size(208, 147);
             picSanPham.SizeMode = PictureBoxSizeMode.StretchImage;
             picSanPham.TabIndex = 22;
             picSanPham.TabStop = false;

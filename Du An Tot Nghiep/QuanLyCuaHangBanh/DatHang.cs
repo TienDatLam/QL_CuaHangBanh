@@ -217,7 +217,6 @@ namespace GUI_CuaHangBanh
                         MessageBox.Show("Thêm khách hàng mới thất bại!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
-
                     khach = busKH.TimKhachHangTheoSDT(sdt);
                     if (khach == null)
                     {
@@ -225,31 +224,39 @@ namespace GUI_CuaHangBanh
                         return;
                     }
                 }
-
                 string maKhachHang = khach.MaKhachHang.ToString();
                 int[] danhSachMaNV = { 1, 2, 3, 4, 5 };
                 Random rnd = new Random();
                 string maNhanVien = danhSachMaNV[rnd.Next(danhSachMaNV.Length)].ToString();
 
                 if (_gioVao == DateTime.MinValue)
-                {
                     _gioVao = DateTime.Now;
-                }
 
- 
                 int tongTienGoc = (int)nudTongTien.Value;
                 int phanTramGiam = (int)nudKhuyenMai.Value;
                 decimal soTienGiam = tongTienGoc * (phanTramGiam / 100m);
                 int tongSauGiam = tongTienGoc - (int)soTienGiam;
+                string tenBanFromDB = null;
+                int maBanInt = 0;
 
-                // Gán vào DTO hóa đơn
+                if (maBanDangChon != "MangVe")
+                {
+                    maBanInt = int.Parse(new string(maBanDangChon.Where(char.IsDigit).ToArray()));
+                    BUSBanAn busBan = new BUSBanAn();
+                    var banInfo = busBan.TimBanTheoMa(maBanInt);
+                    if (banInfo != null)
+                        tenBanFromDB = banInfo.TenBan;
+                }
+                if (string.IsNullOrEmpty(tenBanFromDB))
+                    tenBanFromDB = tenBanDangChon;
                 DTOHoaDon hd = new DTOHoaDon
                 {
                     DateCheck = _gioVao,
                     DateOut = DateTime.Now,
                     MaKhachHang = maKhachHang,
                     MaNhanVien = maNhanVien,
-                    MaBan = maBanDangChon == "MangVe" ? 0 : int.Parse(new string(maBanDangChon.Where(char.IsDigit).ToArray())),
+                    MaBan = maBanDangChon == "MangVe" ? 0 : maBanInt,
+                    TenBan = tenBanFromDB,
                     TrangThai = "Đã thanh toán",
                     TongHoaDon = tongSauGiam,
                     GiamGia = phanTramGiam
@@ -259,74 +266,66 @@ namespace GUI_CuaHangBanh
                 busHD.ThemHoaDon(hd);
 
                 DTOHoaDon hoaDonMoi = busHD.LayHoaDonMoiNhat();
-
-                if (hoaDonMoi != null)
+                if (hoaDonMoi == null)
                 {
-                    // Cập nhật bàn thành Trống
-                    if (maBanDangChon != "MangVe")
-                    {
-                        int maBanInt = int.Parse(new string(maBanDangChon.Where(char.IsDigit).ToArray()));
-                        BUSBanAn busBan = new BUSBanAn();
-                        DTOBanAn ban = new DTOBanAn { MaBan = maBanInt, TrangThai = "Trống" };
-                        busBan.CapNhat(ban);
-                    }
-
-                    // Hỏi có muốn in hóa đơn không
-                    DialogResult dr = MessageBox.Show("Thanh toán thành công!\nBạn có muốn in hóa đơn không?", "Thông báo", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-                    if (dr == DialogResult.Yes)
-                    {
-                        List<DTOChiTietSPTheoBan> dsChiTiet = new List<DTOChiTietSPTheoBan>();
-
-                        // Lấy từ DataGridView nếu có
-                        foreach (DataGridViewRow row in dgvSanPhamTheoBan.Rows)
-                        {
-                            if (row.IsNewRow) continue;
-
-                            string tenSP = row.Cells["TenSanPham"].Value?.ToString() ?? "";
-                            int soLuong = Convert.ToInt32(row.Cells["SoLuong"].Value);
-                            int donGia = Convert.ToInt32(row.Cells["DonGia"].Value);
-
-                            DTOChiTietSPTheoBan ct = new DTOChiTietSPTheoBan
-                            {
-                                TenSanPham = tenSP,
-                                SoLuong = soLuong,
-                                DonGia = donGia
-                            };
-                            dsChiTiet.Add(ct);
-                        }
-                        if (dsChiTiet.Count == 0)
-                        {
-                            DataTable dtChiTiet = BUSHoaDon.LayChiTietHoaDon(hoaDonMoi.MaHoaDon);
-                            foreach (DataRow row in dtChiTiet.Rows)
-                            {
-                                DTOChiTietSPTheoBan ct = new DTOChiTietSPTheoBan
-                                {
-                                    TenSanPham = row["TenSanPham"].ToString(),
-                                    SoLuong = Convert.ToInt32(row["SoLuong"]),
-                                    DonGia = Convert.ToInt32(row["DonGia"])
-                                };
-                                dsChiTiet.Add(ct);
-                            }
-                        }
-
-                        InHoaDon frm = new InHoaDon(hoaDonMoi, dsChiTiet, tenBanDangChon);
-
-                        frm.ShowDialog();
-                    }
+                    MessageBox.Show("Không thể lấy hóa đơn mới!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
-                else
+                BUSCTHoaDon busCTHD = new BUSCTHoaDon();
+                BUSSanPham busSP = new BUSSanPham(); 
+
+                foreach (DataGridViewRow row in dgvSanPhamTheoBan.Rows)
                 {
-                    MessageBox.Show("Không thể lấy hóa đơn mới để in!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    if (row.IsNewRow) continue;
+                    string tenSP = row.Cells["TenSanPham"].Value.ToString();
+                    string maSP = busSP.LayMaSanPhamTheoTen(tenSP);
+
+                    DTOCTHoaDon cthd = new DTOCTHoaDon
+                    {
+                        MaHoaDon = hoaDonMoi.MaHoaDon,
+                        MaSanPham = maSP,
+                        SoLuong = Convert.ToInt32(row.Cells["SoLuong"].Value),
+                        DonGia = Convert.ToInt32(row.Cells["DonGia"].Value)
+                    };
+
+                    busCTHD.ThemChiTietHoaDon(cthd);
+                }
+                if (maBanDangChon != "MangVe")
+                {
+                    BUSBanAn busBan = new BUSBanAn();
+                    busBan.CapNhatTrangThai(maBanInt, "Có khách");
+                }
+                DialogResult dr = MessageBox.Show("Thanh toán thành công!\nBạn có muốn in hóa đơn không?",
+                                                  "Thông báo", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                if (dr == DialogResult.Yes)
+                {
+                    List<DTOChiTietSPTheoBan> dsChiTiet = new List<DTOChiTietSPTheoBan>();
+                    DataTable dtChiTiet = BUSHoaDon.LayChiTietHoaDon(hoaDonMoi.MaHoaDon);
+                    foreach (DataRow row in dtChiTiet.Rows)
+                    {
+                        dsChiTiet.Add(new DTOChiTietSPTheoBan
+                        {
+                            TenSanPham = row["TenSanPham"].ToString(),
+                            SoLuong = Convert.ToInt32(row["SoLuong"]),
+                            DonGia = Convert.ToInt32(row["DonGia"])
+                        });
+                    }
+
+                    if (dsChiTiet.Count == 0)
+                    {
+                        MessageBox.Show("Không tìm thấy chi tiết hóa đơn!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    InHoaDon frm = new InHoaDon(hoaDonMoi, dsChiTiet, tenBanFromDB);
+                    frm.ShowDialog();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi khi thanh toán: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Lỗi: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-
-
         private int indexSelected = -1;
         private void btnSuaSP_Click(object sender, EventArgs e)
         {

@@ -12,6 +12,15 @@ namespace BLL_CuaHangBanh
     public class BUSHoaDon
     {
         DALHoaDon hoaDonDAL = new DALHoaDon();
+        public bool XoaHoaDonVaKhachHang(int maHoaDon, int maKhachHang)
+        {
+            return hoaDonDAL.XoaHoaDonVaKhachHang(maHoaDon, maKhachHang);
+        }
+        public DTOHoaDon LayHoaDonTheoMa(int maHoaDon)
+        {
+            return hoaDonDAL.GetById(maHoaDon);
+        }
+
 
         public static DataTable LayTatCaHoaDon()
         {

@@ -14,4 +14,9 @@ public class BUSCTHoaDon
     {
         return ctDAL.InsertCTHoaDon(ct);
     }
+    public List<DTOChiTietSPTheoBan> LayChiTietTheoHoaDon(int maHoaDon)
+    {
+        return ctDAL.GetByMaHoaDon(maHoaDon);
+
+    }
 }

@@ -18,6 +18,9 @@ namespace GUI_CuaHangBanh
     {
         private BUSHoaDon bus = new BUSHoaDon();
         int maHoaDonDuocChon = -1;
+        private BUSBanAn banBUS;
+        private BUSCTHoaDon chiTietBUS;
+        private BUSHoaDon hoaDonBUS;
 
         public ThongKe()
         {
@@ -29,6 +32,8 @@ namespace GUI_CuaHangBanh
         }
         private void frmThongKe_Load(object sender, EventArgs e)
         {
+            dgvDSHD.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvDSHD.MultiSelect = false;
             LoadcmbSanPham();
             LoadcmbNhanVien();
             LoadDanhSachHoaDon();
@@ -86,40 +91,50 @@ namespace GUI_CuaHangBanh
         {
             if (e.RowIndex >= 0 && dgvDSHD.Columns.Contains("MaHoaDon"))
             {
-                DataGridViewRow selectedRow = dgvDSHD.Rows[e.RowIndex];
-                object cellValue = selectedRow.Cells["MaHoaDon"].Value;
+                object cellValue = dgvDSHD.Rows[e.RowIndex].Cells["MaHoaDon"].Value;
 
-                if (cellValue != null && int.TryParse(cellValue.ToString(), out int maHD))
+                if (cellValue != null)
                 {
-                    DataTable dtCT = BUSThongKe.LayChiTietHoaDon(maHD);
+                    string maHD = cellValue.ToString();
 
-                    dgvChiTietHoaDon.DataSource = dtCT;
-                    dgvChiTietHoaDon.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                    // Gọi đúng hàm DAL/BUS để lấy chi tiết hóa đơn
+                    DataTable dtCT = DAL_CuaHangBanh.DALThongKe.TK_ChiTietHoaDon(maHD);
 
-                    if (dtCT.Columns.Contains("DonGia"))
+                    if (dtCT != null && dtCT.Rows.Count > 0)
                     {
-                        dgvChiTietHoaDon.Columns["DonGia"].DefaultCellStyle.Format = "N0";
-                        dgvChiTietHoaDon.Columns["DonGia"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-                    }
+                        dgvChiTietHoaDon.DataSource = dtCT;
+                        dgvChiTietHoaDon.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
-                    decimal tongTien = 0;
-                    foreach (DataRow row in dtCT.Rows)
-                    {
-                        if (int.TryParse(row["SoLuong"].ToString(), out int sl) &&
-                            decimal.TryParse(row["DonGia"].ToString(), out decimal dg))
+                        if (dtCT.Columns.Contains("DonGia"))
                         {
-                            tongTien += sl * dg;
+                            dgvChiTietHoaDon.Columns["DonGia"].DefaultCellStyle.Format = "N0";
+                            dgvChiTietHoaDon.Columns["DonGia"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
                         }
-                    }
 
-                    txtTongTienn.Text = tongTien.ToString("N0");
+                        decimal tongTien = 0;
+                        foreach (DataRow row in dtCT.Rows)
+                        {
+                            if (int.TryParse(row["SoLuong"].ToString(), out int sl) &&
+                                decimal.TryParse(row["DonGia"].ToString(), out decimal dg))
+                            {
+                                tongTien += sl * dg;
+                            }
+                        }
+
+                        txtTongTienn.Text = tongTien.ToString("N0");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Không tìm thấy chi tiết hóa đơn.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        dgvChiTietHoaDon.DataSource = null;
+                        txtTongTienn.Clear();
+                    }
                 }
                 else
                 {
                     MessageBox.Show("Không thể xác định mã hóa đơn!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
-
         }
 
 
@@ -254,70 +269,106 @@ namespace GUI_CuaHangBanh
                 MessageBox.Show("Lỗi khi làm mới thống kê: " + ex.Message, "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
+        private string connString = @"Data Source=ADMIN\TIENDAT1;Initial Catalog=DATN_QLCuaHangBanh;Integrated Security=True;Encrypt=False";
         private void btnXoaHoaDon_Click(object sender, EventArgs e)
         {
-            if (dgvDSHD.CurrentRow != null)
+            if (dgvDSHD.SelectedRows.Count == 0)
             {
-                string maHD = dgvDSHD.CurrentRow.Cells["MaHoaDon"].Value.ToString();
-                int maHoaDon;
-
-                if (int.TryParse(maHD, out maHoaDon))
+                MessageBox.Show("Vui lòng chọn hóa đơn cần xóa!");
+                return;
+            }
+            int maHoaDon = Convert.ToInt32(dgvDSHD.SelectedRows[0].Cells["MaHoaDon"].Value);
+            int maKhachHang;
+            using (SqlConnection conn = new SqlConnection(connString))
+            {
+                conn.Open();
+                string queryGetKH = "SELECT MaKhachHang FROM HoaDon WHERE MaHoaDon = @mahd";
+                SqlCommand cmd = new SqlCommand(queryGetKH, conn);
+                cmd.Parameters.AddWithValue("@mahd", maHoaDon);
+                object result = cmd.ExecuteScalar();
+                if (result == null)
                 {
-                    var result = MessageBox.Show("Bạn có chắc muốn xóa hóa đơn này không?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (result == DialogResult.Yes)
-                    {
-                        // Lấy mã khách hàng từ dòng được chọn
-                        string maKH = dgvDSHD.CurrentRow.Cells["MaKhach"].Value?.ToString();
-
-                        // Kiểm tra số lượng hóa đơn của khách hàng này
-                        string sqlCount = "SELECT COUNT(*) FROM HoaDon WHERE MaKhach = @0";
-                        List<object> argsCount = new List<object> { maKH };
-
-                        int soHoaDon = 0;
-                        using (SqlDataReader reader = DBUtil.Query(sqlCount, argsCount))
-                        {
-                            if (reader.Read())
-                            {
-                                soHoaDon = reader.GetInt32(0);
-                            }
-                        }
-
-                        // Xóa hóa đơn
-                        bool thanhCong = bus.XoaHoaDon(maHoaDon);
-
-                        if (thanhCong)
-                        {
-                            // Nếu khách chỉ có 1 hóa đơn => xóa luôn khách
-                            if (soHoaDon == 1 && !string.IsNullOrEmpty(maKH))
-                            {
-                                BUSKhachHang busKH = new BUSKhachHang();
-                                bool xoaKhach = busKH.XoaKhachHang(maKH);
-                                if (xoaKhach)
-                                {
-                                    MessageBox.Show("Đã xóa khách hàng liên quan.");
-                                }
-                                else
-                                {
-                                    MessageBox.Show("Không thể xóa khách hàng.");
-                                }
-                            }
-
-                            MessageBox.Show("Xóa hóa đơn thành công!");
-                            dgvDSHD.DataSource = BUSHoaDon.LayTatCaHoaDon();
-                        }
-                        else
-                        {
-                            MessageBox.Show("Xóa hóa đơn thất bại!");
-                        }
-                    }
+                    MessageBox.Show("Không tìm thấy khách hàng cho hóa đơn này!");
+                    return;
                 }
-                else
+                maKhachHang = Convert.ToInt32(result);
+            }
+            if (MessageBox.Show("Bạn có chắc muốn xóa hóa đơn này và khách hàng liên quan?",
+                                "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.No)
+            {
+                return;
+            }
+            var busHD = new BUSHoaDon();
+            bool isDeleted = busHD.XoaHoaDonVaKhachHang(maHoaDon, maKhachHang);
+
+            if (isDeleted)
+            {
+                MessageBox.Show("Xóa thành công!");
+                LoadDanhSachHoaDon();
+            }
+            else
+            {
+                MessageBox.Show("Có lỗi xảy ra khi xóa!");
+
+            }
+        }
+        private void btnInHoaDon_Click(object sender, EventArgs e)
+        {
+            if (dgvDSHD.CurrentRow == null)
+            {
+                MessageBox.Show("Vui lòng chọn hóa đơn để in lại!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                // Khởi tạo BUS nếu chưa khởi tạo
+                if (hoaDonBUS == null) hoaDonBUS = new BUSHoaDon();
+                if (chiTietBUS == null) chiTietBUS = new BUSCTHoaDon();
+                if (banBUS == null) banBUS = new BUSBanAn();
+
+                // Lấy mã hóa đơn từ DataGridView
+                object cellValue = dgvDSHD.CurrentRow.Cells["MaHoaDon"].Value;
+                if (cellValue == null || cellValue == DBNull.Value)
                 {
-                    MessageBox.Show("Mã hóa đơn không hợp lệ!");
-
+                    MessageBox.Show("Không thể xác định mã hóa đơn!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
+
+                int maHoaDon = Convert.ToInt32(cellValue);
+
+                // Lấy hóa đơn
+                DTOHoaDon hoaDon = hoaDonBUS.LayHoaDonTheoMa(maHoaDon);
+                if (hoaDon == null)
+                {
+                    MessageBox.Show("Không tìm thấy hóa đơn!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // Lấy danh sách chi tiết
+                List<DTOChiTietSPTheoBan> chiTiet = chiTietBUS.LayChiTietTheoHoaDon(maHoaDon);
+                if (chiTiet == null || chiTiet.Count == 0)
+                {
+                    MessageBox.Show("Không có chi tiết cho hóa đơn này!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Lấy tên bàn
+                var ban = banBUS.TimBanTheoMa(hoaDon.MaBan);
+                string tenBan = ban != null ? ban.TenBan : "Không rõ bàn";
+
+                // Mở form in hóa đơn
+                using (InHoaDon frm = new InHoaDon(hoaDon, chiTiet, tenBan))
+                {
+                    frm.ShowDialog();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi in hóa đơn: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
     }
 }
-    }
-}
+

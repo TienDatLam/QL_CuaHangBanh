@@ -45,6 +45,13 @@ namespace DAL_CuaHangBanh
             reader.Close();
             return null;
         }
+        public void UpdateTrangThai(int maBan, string trangThai)
+        {
+            string sql = "UPDATE Ban SET TrangThai = @0 WHERE MaBan = @1";
+            List<object> args = new List<object> { trangThai, maBan };
+            DBUtil.Update(sql, args);
+        }
+
 
         public DTOBanAn GetById(int maBan)
         {

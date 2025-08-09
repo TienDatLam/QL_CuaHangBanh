@@ -32,6 +32,15 @@ public class DALSanPham
 
         return ds;
     }
+
+    public string LayMaSanPhamTheoTen(string tenSP)
+    {
+        string sql = "SELECT MaSanPham FROM SanPham WHERE TenSanPham = @0";
+        List<object> args = new List<object>() { tenSP };
+
+        object result = DBUtil.Value(sql, args);
+        return result?.ToString();
+    }
     public void Insert(DTOSanPham sp)
     {
         string sql = "INSERT INTO SanPham(MaDanhMuc, TenSanPham, SoLuong, MoTa, DonGia, HinhAnh, Xoa) VALUES (@0, @1, @2, @3, @4, @5, 0)";
